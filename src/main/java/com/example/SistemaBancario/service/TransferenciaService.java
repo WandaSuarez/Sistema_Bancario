@@ -3,8 +3,7 @@ package com.example.SistemaBancario.service;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.stream.Collectors;
-import org.springframework.beans.factory.annotation.Autowired;
+import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.example.SistemaBancario.repository.TransaccionRepository;
@@ -19,24 +18,46 @@ import com.example.SistemaBancario.enums.TipoTransaccion;
 @Service
 @Transactional
 public class TransferenciaService {
-    @Autowired
-    private TransaccionRepository transaccionRepository;
-    
-    @Autowired
-    private CuentaRepository cuentaRepository;
+    private final TransaccionRepository transaccionRepository;
+    private final CuentaRepository cuentaRepository;
+    private final BanelcoService banelcoService;
 
     private static final double MONTO_MINIMO = 100.0;
-    private static final double LIMITE_DIARIO = 500000.0;
+    private static final double LIMITE_PESOS = 1000000.0;
+    private static final double LIMITE_DOLARES = 5000.0;
+    private static final double CARGO_PESOS = 0.02;
+    private static final double CARGO_DOLARES = 0.005;
+
+    private static final double LIMITE_DIARIO_PESOS = 500000.0;
+    private static final double LIMITE_DIARIO_DOLARES = 10000.0;
+
+    public TransferenciaService(TransaccionRepository transaccionRepository, CuentaRepository cuentaRepository, BanelcoService banelcoService) {
+        this.transaccionRepository = transaccionRepository;
+        this.cuentaRepository = cuentaRepository;
+        this.banelcoService = banelcoService;
+    }
+
+    public static class TransferenciaException extends RuntimeException {
+        public TransferenciaException(String message) {
+            super(message);
+        }
+    }
 
     public TransferenciaResponseDTO realizarTransferencia(TransferenciaRequestDTO request) {
         validarMontoTransferencia(request.getMonto());
-        validarLimiteDiario(request.getCuentaOrigen(), request.getMonto());
+        validarLimiteDiario(request.getMonto(), request.getMoneda());
         
-        Cuenta origen = validarCuentaOrigen(request.getCuentaOrigen(), request.getMonto());
-        Cuenta destino = validarCuentaDestino(request.getCuentaDestino(), request.getMoneda());
+        Cuenta origen = validarCuentaOrigen(request.getCuentaOrigen(), request.getMoneda(), request.getMonto());
+        Cuenta destino = validarCuentaDestino(request.getCuentaDestino(), request.getMoneda(), request.getMonto());
         
-        ejecutarTransferencia(origen, destino, request.getMonto());
-        registrarTransaccion(origen, destino, request.getMonto());
+        Double montoTotal = calcularMontoConCargos(request.getMonto(), request.getMoneda());
+        
+        if (destino != null) {
+            ejecutarTransferencia(origen, destino, montoTotal);
+            registrarTransaccion(origen, destino, montoTotal);
+        } else {
+            ejecutarTransferenciaInterbancaria(origen, request.getCuentaDestino(), montoTotal);
+        }
         
         return new TransferenciaResponseDTO("EXITOSA", "Transferencia realizada con éxito");
     }
@@ -47,9 +68,9 @@ public class TransferenciaService {
     }
 
     public Double consultarSaldo(Long numeroCuenta) {
-        Cuenta cuenta = cuentaRepository.findByNumeroCuenta(numeroCuenta)
-            .orElseThrow(() -> new RuntimeException("No se encontró la cuenta"));
-        return cuenta.getSaldo();
+        return cuentaRepository.findByNumeroCuenta(numeroCuenta)
+            .map(Cuenta::getSaldo)
+            .orElseThrow(() -> new TransferenciaException("No se encontro la cuenta"));
     }
 
     public List<TransaccionDTO> obtenerUltimasTransacciones(Long numeroCuenta, int limite) {
@@ -59,40 +80,70 @@ public class TransferenciaService {
 
     private void validarMontoTransferencia(Double monto) {
         if (monto < MONTO_MINIMO) {
-            throw new RuntimeException("El monto mínimo de transferencia es " + MONTO_MINIMO);
+            throw new TransferenciaException("El monto mínimo de transferencia es " + MONTO_MINIMO);
         }
     }
+    
 
-    private void validarLimiteDiario(Long numeroCuenta, Double montoTransferencia) {
+
+    private void validarLimiteDiario(Double montoTransferencia, String moneda) {
         Double totalDiario = transaccionRepository.sumMontoByTipo(TipoTransaccion.TRANSFERENCIA_SALIENTE);
         if (totalDiario == null) {
             totalDiario = 0.0;
         }
         
-        if (totalDiario + montoTransferencia > LIMITE_DIARIO) {
-            throw new RuntimeException("Se ha superado el límite diario de transferencias");
+        double limiteMoneda = "PESOS".equals(moneda) ? LIMITE_DIARIO_PESOS : LIMITE_DIARIO_DOLARES;
+        
+        if (totalDiario + montoTransferencia > limiteMoneda) {
+            throw new TransferenciaException("Se ha superado el límite diario de transferencias en " + moneda);
         }
     }
     
 
-    private Cuenta validarCuentaOrigen(Long numeroCuenta, Double monto) {
+    private Cuenta validarCuentaOrigen(Long numeroCuenta, String moneda, Double monto) {
         Cuenta cuenta = cuentaRepository.findByNumeroCuenta(numeroCuenta)
-            .orElseThrow(() -> new RuntimeException("Cuenta origen no encontrada"));
+            .orElseThrow(() -> new TransferenciaException("Cuenta origen no encontrada"));
             
         if (cuenta.getSaldo() < monto) {
-            throw new RuntimeException("Saldo insuficiente");
+            throw new TransferenciaException("Saldo insuficiente");
+        }
+
+        if (!cuenta.getMoneda().equals(moneda)) {
+            throw new TransferenciaException("La moneda de la cuenta origen no coincide");
+        }
+
+        return cuenta;
+    }
+
+    private Cuenta validarCuentaDestino(Long numeroCuenta, String moneda, Double monto) {
+        Optional<Cuenta> cuentaOptional = cuentaRepository.findByNumeroCuenta(numeroCuenta);
+        
+        if (cuentaOptional.isEmpty()) {
+            if (!banelcoService.realizarTransferenciaInterbancaria(numeroCuenta, numeroCuenta, monto, moneda)) {
+                throw new TransferenciaException("La transferencia interbancaria no pudo completarse");
+            }
+            return null;
+        }
+        
+        Cuenta cuenta = cuentaOptional.get();
+        if (!cuenta.getMoneda().equals(moneda)) {
+            throw new TransferenciaException("La moneda de la cuenta destino no coincide");
         }
         return cuenta;
     }
 
-    private Cuenta validarCuentaDestino(Long numeroCuenta, String moneda) {
-        Cuenta cuenta = cuentaRepository.findByNumeroCuenta(numeroCuenta)
-            .orElseThrow(() -> new RuntimeException("Cuenta destino no encontrada"));
-               
-        if (!cuenta.getMoneda().equals(moneda)) {
-            throw new RuntimeException("La moneda de la cuenta destino no coincide");
+    private Double calcularMontoConCargos(Double monto, String moneda) {
+        Double montoTotal = monto;
+        
+        if ("PESOS".equals(moneda) && monto > LIMITE_PESOS) {
+            Double cargo = monto * CARGO_PESOS; // 2% si supera $1,000,000
+            montoTotal += cargo;
+        } else if ("DOLARES".equals(moneda) && monto > LIMITE_DOLARES) {
+            Double cargo = monto * CARGO_DOLARES; // 0.5% si supera U$S5,000
+            montoTotal += cargo;
         }
-        return cuenta;
+        
+        return montoTotal;
     }
     
 
@@ -103,24 +154,39 @@ public class TransferenciaService {
         cuentaRepository.save(destino);
     }
 
-    private void registrarTransaccion(Cuenta origen, Cuenta destino, Double monto) {
-        // Registro de transacción saliente
-        Transaccion salienteTransaccion = new Transaccion();
-        salienteTransaccion.setCuenta(origen);
-        salienteTransaccion.setTipo(TipoTransaccion.TRANSFERENCIA_SALIENTE);
-        salienteTransaccion.setMonto(monto);
-        salienteTransaccion.setFecha(LocalDateTime.now());  // Agregar esta línea
-        salienteTransaccion.setDescripcionBreve("Transferencia a cuenta " + destino.getNumeroCuenta());
-        transaccionRepository.save(salienteTransaccion);
+    private void ejecutarTransferenciaInterbancaria(Cuenta origen, Long cuentaDestino, Double monto) {
+        origen.setSaldo(origen.getSaldo() - monto);
+        cuentaRepository.save(origen);
+        registrarTransaccionInterbancaria(origen, cuentaDestino, monto);
+    }
 
-        // Registro de transacción entrante
-        Transaccion entranteTransaccion = new Transaccion();
-        entranteTransaccion.setCuenta(destino);
-        entranteTransaccion.setTipo(TipoTransaccion.TRANSFERENCIA_ENTRANTE);
-        entranteTransaccion.setMonto(monto);
-        entranteTransaccion.setFecha(LocalDateTime.now());  // Agregar esta línea
-        entranteTransaccion.setDescripcionBreve("Transferencia desde cuenta " + origen.getNumeroCuenta());
-        transaccionRepository.save(entranteTransaccion);
+    private void registrarTransaccion(Cuenta origen, Cuenta destino, Double monto) {
+        registrarTransaccionSaliente(origen, destino.getNumeroCuenta(), monto);
+        registrarTransaccionEntrante(destino, origen.getNumeroCuenta(), monto);
+    }
+
+    private void registrarTransaccionSaliente(Cuenta cuenta, Long cuentaDestino, Double monto) {
+        Transaccion transaccion = new Transaccion();
+        transaccion.setCuenta(cuenta);
+        transaccion.setTipo(TipoTransaccion.TRANSFERENCIA_SALIENTE);
+        transaccion.setMonto(monto);
+        transaccion.setFecha(LocalDateTime.now());
+        transaccion.setDescripcionBreve("Transferencia a cuenta " + cuentaDestino);
+        transaccionRepository.save(transaccion);
+    }
+
+    private void registrarTransaccionEntrante(Cuenta cuenta, Long cuentaOrigen, Double monto) {
+        Transaccion transaccion = new Transaccion();
+        transaccion.setCuenta(cuenta);
+        transaccion.setTipo(TipoTransaccion.TRANSFERENCIA_ENTRANTE);
+        transaccion.setMonto(monto);
+        transaccion.setFecha(LocalDateTime.now());
+        transaccion.setDescripcionBreve("Transferencia desde cuenta " + cuentaOrigen);
+        transaccionRepository.save(transaccion);
+    }
+
+    private void registrarTransaccionInterbancaria(Cuenta origen, Long cuentaDestino, Double monto) {
+        registrarTransaccionSaliente(origen, cuentaDestino, monto);
     }
 
     private List<TransaccionDTO> convertirATransaccionDTO(List<Transaccion> transacciones) {
@@ -131,6 +197,6 @@ public class TransferenciaService {
                 t.getDescripcionBreve(),
                 t.getMonto()
             ))
-            .collect(Collectors.toList());
+            .toList();
     }
 }

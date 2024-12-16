@@ -15,13 +15,13 @@ public class Cuenta {
     private double saldo;
     private String moneda;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "cliente_id")
-    @JsonBackReference
+    @ManyToOne(fetch = FetchType.LAZY) // relacion de m  cuentas a 1 cliente
+    @JoinColumn(name = "cliente_id") // columa  q relaciona con cleinte
+    @JsonBackReference // evito ciclo infinito al convertir a JSON
     private Cliente cliente;
 
-    @OneToMany(mappedBy = "cuenta", cascade = CascadeType.ALL)
-    private List<Transaccion> transacciones;
+    @OneToMany(mappedBy = "cuenta", cascade = CascadeType.ALL) // 1 cuenta tiene m transaccioes
+    private List<Transaccion> transacciones; // lista
 
     // Getters y Setters
     public Long getNumeroCuenta() {

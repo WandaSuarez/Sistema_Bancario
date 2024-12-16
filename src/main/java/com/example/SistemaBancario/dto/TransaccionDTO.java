@@ -1,12 +1,14 @@
 package com.example.SistemaBancario.dto;
 
+import com.example.SistemaBancario.enums.TipoTransaccion;
+
 public class TransaccionDTO {
     private String fecha;
-    private String tipo;
+    private TipoTransaccion tipo;
     private String descripcionBreve;
     private Double monto;
 
-    public TransaccionDTO(String fecha, String tipo, String descripcionBreve, Double monto) {
+    public TransaccionDTO(String fecha, TipoTransaccion tipo, String descripcionBreve, Double monto) {
         this.fecha = fecha;
         this.tipo = tipo;
         this.descripcionBreve = descripcionBreve;
@@ -20,10 +22,10 @@ public class TransaccionDTO {
     public void setFecha(String fecha) {
         this.fecha = fecha;
     }
-    public String getTipo() {
+    public TipoTransaccion getTipo() {
         return tipo;
     }
-    public void setTipo(String tipo) {
+    public void setTipo(TipoTransaccion tipo) {
         this.tipo = tipo;
     }
     public String getDescripcionBreve() {

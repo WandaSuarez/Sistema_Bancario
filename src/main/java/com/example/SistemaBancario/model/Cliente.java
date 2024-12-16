@@ -9,7 +9,7 @@ import com.fasterxml.jackson.annotation.JsonManagedReference;
 @Entity
 public class Cliente {
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.IDENTITY) // genero ids automaticamente
     private Long id;
     
     private String dni;
@@ -17,9 +17,9 @@ public class Cliente {
     private String apellido;
     private String password;
     
-    @OneToMany(mappedBy = "cliente", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    @JsonManagedReference
-    private List<Cuenta> cuentas = new ArrayList<>();
+    @OneToMany(mappedBy = "cliente", cascade = CascadeType.ALL, fetch = FetchType.LAZY) // relacion de 1 a m con cuentas
+    @JsonManagedReference // envito bucles infinitos y demas
+    private List<Cuenta> cuentas = new ArrayList<>(); // lista d cuentas d clientes
 
 
     // Getters y Setters

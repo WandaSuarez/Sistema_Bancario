@@ -19,7 +19,7 @@ public class CuentaController {
 
     @PostMapping // enponid POST para crear las cuentas
     public ResponseEntity<Cuenta> crearCuenta(@RequestBody @Valid Cuenta cuenta) { // recibo y valido datos de la cuenta
-        return ResponseEntity.ok(cuentaService.crearCuenta(cuenta));
+        return ResponseEntity.ok(cuentaService.crearCuenta(cuenta));// devuelvo la cuenta creada
     }
 
     @GetMapping("/{numeroCuenta}") // endpoin GET para obtener la cuenta  x numero de cuenta
@@ -29,15 +29,15 @@ public class CuentaController {
 
     @GetMapping("/cliente/{clienteId}") // endpoin GET para obtener la cuenta x cliente id
     public ResponseEntity<List<Cuenta>> obtenerCuentasPorCliente(@PathVariable Long clienteId) {
-        return ResponseEntity.ok(cuentaService.obtenerCuentasPorCliente(clienteId)); // devuelvo  la cuenta x el cliente id
+        return ResponseEntity.ok(cuentaService.obtenerCuentasPorCliente(clienteId)); // devuelvo la lista de cuentas del cliente id
     }
 
-    @GetMapping("/moneda/{moneda}") // endpoin GET para obtener la cuenta x moneda
+    @GetMapping("/moneda/{moneda}") // endpoin GET para filtrar cuentas x tipo moneda
     public ResponseEntity<List<Cuenta>> obtenerCuentasPorMoneda(@PathVariable String moneda) {
-        return ResponseEntity.ok(cuentaService.obtenerCuentasPorMoneda(moneda)); // devunevo la cuenta x moneda encontrada
+        return ResponseEntity.ok(cuentaService.obtenerCuentasPorMoneda(moneda)); // devunevo la lista de cuentas con esa moneda 
     }
 
-    @PutMapping("/{numeroCuenta}") // endpoin PUT para obtener actualizar la cuenta
+    @PutMapping("/{numeroCuenta}") // endpoin PUT para actualizar la cuenta existente
     public ResponseEntity<Cuenta> actualizarCuenta(
             @PathVariable Long numeroCuenta,
             @RequestBody @Valid Cuenta cuenta) { // nuevos datos de la cuenta, el requestBody ->convierte el jsson q llega en la peticion a un obj
@@ -50,16 +50,16 @@ public class CuentaController {
         return ResponseEntity.ok().build();// retorno repuesta exitosa sin contenido -> build -> construye la repuesta http final, s usa cuando no hay datos q deovolver, solo el estado del codigo
     }
 
-    @GetMapping("/saldo-mayor/{saldo}") // endpoin GET para obtener la cuenta x mayor saldo
+    @GetMapping("/saldo-mayor/{saldo}") // endpoin GET para filtrar cuentas x saldo minimo
     public ResponseEntity<List<Cuenta>> obtenerCuentasConSaldoMayor(@PathVariable Double saldo) { // recibo el saldo cm variable d ruta
-        return ResponseEntity.ok(cuentaService.obtenerCuentasConSaldoMayor(saldo)); // devuelvo el saldo encontrado
+        return ResponseEntity.ok(cuentaService.obtenerCuentasConSaldoMayor(saldo)); // devuelvo cuentas q superan el saldo
     }
 
-    @GetMapping("/saldo-rango") 
+    @GetMapping("/saldo-rango")  // endpoint GET para buscar cuentas en un rango de saldo
     public ResponseEntity<List<Cuenta>> obtenerCuentasPorRangoSaldo(
-        @RequestParam Double minimo, 
-        @RequestParam Double maximo) {
-        return ResponseEntity.ok(cuentaService.findCuentasBySaldoRange(minimo, maximo));
+        @RequestParam Double minimo, //saldo minimp
+        @RequestParam Double maximo) { //saldo maximo
+        return ResponseEntity.ok(cuentaService.findCuentasBySaldoRange(minimo, maximo)); // devuelvo cuentas dentro del rango
     }
 
 }

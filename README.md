@@ -1,12 +1,15 @@
 # Sistema Bancario - Servicio de Transferencias
 
-Sistema que permite realizar transferencias bancarias entre cuentas, implementando validaciones y reglas de negocio específicas para garantizar operaciones seguras y controladas.
+Sistema que gestiona transferencias bancarias entre cuentas con validaciones y reglas de negocio.
+
+### Ruta general
+- http://localhost:8080/{aca va ruta de los endpoints}
 
 ## Funcionalidades Detalladas
 
 ### Transferencias
 - Transferencias entre cuentas en PESOS y DOLARES
-- Monto mínimo de transferencia: $100
+- Monto mínimo: $100a
 - Validación de moneda coincidente entre cuenta origen y transferencia
 - Verificación automática de saldo disponible
 - Actualización en tiempo real de saldos
@@ -19,10 +22,10 @@ Sistema que permite realizar transferencias bancarias entre cuentas, implementan
 
 ### Sistema de Cargos
 - PESOS:
-  - 2% para transferencias mayores a $1,000,000
+  - 2% sobre montos > $1,000,000
   - Cargo calculado sobre el monto total
 - DOLARES:
-  - 0.5% para transferencias mayores a U$S5,000
+  - 0.5% sobre montos > U$S5,000
   - Cargo calculado sobre el monto total
 
 ## Arquitectura del Sistema
@@ -34,13 +37,15 @@ Sistema que permite realizar transferencias bancarias entre cuentas, implementan
 4. Modelos y DTOs
 
 ### Componentes Principales
-- TransferenciaService: 
+- TransferenciaService:
   - Validaciones de negocio
   - Procesamiento de transferencias
   - Cálculo de cargos
+
 - CuentaRepository:
   - Gestión de cuentas
   - Actualización de saldos
+
 - TransaccionRepository:
   - Registro de operaciones
   - Control de límites diarios
@@ -51,6 +56,7 @@ Sistema que permite realizar transferencias bancarias entre cuentas, implementan
   - cuentaDestino
   - monto
   - moneda
+
 - TransferenciaResponseDTO:
   - estado
   - mensaje
@@ -67,3 +73,8 @@ Sistema que permite realizar transferencias bancarias entre cuentas, implementan
 5. Validación de monto mínimo
 6. Verificación de saldo insuficiente
 7. Validación de moneda diferente
+
+### Uso
+- mvn clean install
+- mvn test
+- mvn spring-boot:run

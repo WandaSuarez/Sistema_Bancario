@@ -1,6 +1,7 @@
 package com.example.SistemaBancario.dto;
 
 import com.example.SistemaBancario.enums.TipoTransaccion;
+import com.example.SistemaBancario.model.Transaccion;
 
 public class TransaccionDTO {
     private String fecha;
@@ -15,6 +16,9 @@ public class TransaccionDTO {
         this.monto = monto;
     }
 
+    public TransaccionDTO(){
+
+    }
     // getters y setters
     public String getFecha() {
         return fecha;
@@ -39,5 +43,14 @@ public class TransaccionDTO {
     }
     public void setMonto(Double monto) {
         this.monto = monto;
+    }
+    
+    public static TransaccionDTO fromTransaccion(Transaccion transaccion) {
+        return new TransaccionDTO(
+            transaccion.getFecha().toString(),
+            transaccion.getTipo(),
+            transaccion.getDescripcionBreve(),
+            transaccion.getMonto()
+        );
     }
 }
